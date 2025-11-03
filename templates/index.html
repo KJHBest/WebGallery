@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <h1 class="logo">Image Gallery</h1>
+                <div class="nav-links">
+                    <a href="{{ url_for('index') }}" class="nav-link active">Gallery</a>
+                    <a href="{{ url_for('upload') }}" class="nav-link">Upload</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <div class="sidebar">
+            <div class="filter-section">
+                <h3>Sort By</h3>
+                <div class="filter-group">
+                    <a href="{{ url_for('index', sort='recent', tag=current_tag) }}"
+                       class="filter-btn {% if sort_by == 'recent' %}active{% endif %}">
+                        Recent
+                    </a>
+                    <a href="{{ url_for('index', sort='popular', tag=current_tag) }}"
+                       class="filter-btn {% if sort_by == 'popular' %}active{% endif %}">
+                        Most Viewed
+                    </a>
+                    <a href="{{ url_for('index', sort='most_liked', tag=current_tag) }}"
+                       class="filter-btn {% if sort_by == 'most_liked' %}active{% endif %}">
+                        Most Liked
+                    </a>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>Tags</h3>
+                <div class="tags-list">
+                    <a href="{{ url_for('index', sort=sort_by) }}"
+                       class="tag {% if not current_tag %}active{% endif %}">
+                        All
+                    </a>
+                    {% for tag in all_tags %}
+                    <a href="{{ url_for('index', tag=tag.name, sort=sort_by) }}"
+                       class="tag {% if current_tag == tag.name %}active{% endif %}">
+                        {{ tag.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="gallery-content">
+            <div class="gallery-header">
+                <h2>
+                    {% if current_tag %}
+                        Images tagged with "{{ current_tag }}"
+                    {% else %}
+                        All Images
+                    {% endif %}
+                </h2>
+            </div>
+
+            <div class="image-grid">
+                {% for image in images %}
+                <div class="image-card">
+                    <a href="{{ url_for('image_detail', image_id=image.id) }}" class="image-link">
+                        <div class="image-container">
+                            <img src="{{ url_for('static', filename='uploads/' + image.filename) }}"
+                                 alt="{{ image.title or image.original_filename }}">
+                            <div class="image-overlay">
+                                <div class="image-stats">
+                                    <span class="stat">
+                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        {{ image.views }}
+                                    </span>
+                                    <span class="stat">
+                                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                        </svg>
+                                        {{ image.likes|length }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                    <div class="image-info">
+                        <h3 class="image-title">{{ image.title or image.original_filename }}</h3>
+                        {% if image.tags %}
+                        <div class="image-tags">
+                            {% for tag in image.tags %}
+                            <a href="{{ url_for('index', tag=tag.name, sort=sort_by) }}" class="tag-badge">
+                                {{ tag.name }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if not images %}
+            <div class="empty-state">
+                <p>No images found.</p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload your first image</a>
+            </div>
+            {% endif %}
+
+            {% if pagination.pages > 1 %}
+            <div class="pagination">
+                {% if pagination.has_prev %}
+                <a href="{{ url_for('index', page=pagination.prev_num, sort=sort_by, tag=current_tag) }}"
+                   class="pagination-btn">Previous</a>
+                {% endif %}
+
+                <div class="pagination-numbers">
+                    {% for page in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page %}
+                            <a href="{{ url_for('index', page=page, sort=sort_by, tag=current_tag) }}"
+                               class="pagination-number {% if page == pagination.page %}active{% endif %}">
+                                {{ page }}
+                            </a>
+                        {% else %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if pagination.has_next %}
+                <a href="{{ url_for('index', page=pagination.next_num, sort=sort_by, tag=current_tag) }}"
+                   class="pagination-btn">Next</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Image - Image Gallery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <h1 class="logo">Image Gallery</h1>
+                <div class="nav-links">
+                    <a href="{{ url_for('index') }}" class="nav-link">Gallery</a>
+                    <a href="{{ url_for('upload') }}" class="nav-link active">Upload</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <div class="upload-container">
+            <h2>Upload Image</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="file">Image File</label>
+                    <div class="file-drop-zone" id="dropZone">
+                        <input type="file" id="file" name="file" accept="image/*" required>
+                        <div class="drop-zone-text">
+                            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <p>Click to upload or drag and drop</p>
+                            <p class="text-small">PNG, JPG, GIF, WEBP (Max 16MB)</p>
+                        </div>
+                    </div>
+                    <div id="preview" class="image-preview" style="display: none;">
+                        <img id="previewImage" alt="Preview">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="title">Title (Optional)</label>
+                    <input type="text" id="title" name="title" class="form-input"
+                           placeholder="Enter image title">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description (Optional)</label>
+                    <textarea id="description" name="description" class="form-textarea"
+                              placeholder="Enter image description" rows="4"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="tags">Tags (Optional)</label>
+                    <input type="text" id="tags" name="tags" class="form-input"
+                           placeholder="Enter tags separated by commas (e.g., nature, landscape, sunset)">
+                    <p class="text-small">Separate tags with commas</p>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        Upload Image
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+
+                <div id="uploadProgress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p id="progressText">Uploading...</p>
+                </div>
+
+                <div id="uploadMessage" class="message" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // File input handling
+        const fileInput = document.getElementById('file');
+        const dropZone = document.getElementById('dropZone');
+        const preview = document.getElementById('preview');
+        const previewImage = document.getElementById('previewImage');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const uploadMessage = document.getElementById('uploadMessage');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Preview image when selected
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    preview.style.display = 'block';
+                    dropZone.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                fileInput.files = e.dataTransfer.files;
+                const event = new Event('change');
+                fileInput.dispatchEvent(event);
+            }
+        });
+
+        // Form submission
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(uploadForm);
+
+            uploadProgress.style.display = 'block';
+            uploadMessage.style.display = 'none';
+            submitBtn.disabled = true;
+
+            fetch('{{ url_for("upload") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                uploadProgress.style.display = 'none';
+                uploadMessage.style.display = 'block';
+
+                if (data.success) {
+                    uploadMessage.className = 'message success';
+                    uploadMessage.textContent = 'Image uploaded successfully!';
+                    setTimeout(() => {
+                        window.location.href = '/image/' + data.image_id;
+                    }, 1500);
+                } else {
+                    uploadMessage.className = 'message error';
+                    uploadMessage.textContent = data.error || 'Upload failed';
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                uploadProgress.style.display = 'none';
+                uploadMessage.style.display = 'block';
+                uploadMessage.className = 'message error';
+                uploadMessage.textContent = 'Upload failed: ' + error.message;
+                submitBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
