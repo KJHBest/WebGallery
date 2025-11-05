@@ -235,18 +235,18 @@ def auto_tag_all_images(untagged_only=True, limit=None):
     print()
 
     # Ollama 연결 확인
-    try:
-        models = ollama.list()
-        model_names = [m['name'] for m in models.get('models', [])]
-        if OLLAMA_MODEL not in model_names:
-            print(f"❌ Error: 모델 '{OLLAMA_MODEL}'를 찾을 수 없습니다.")
-            print(f"사용 가능한 모델: {', '.join(model_names)}")
-            return
-        print(f"✅ Ollama 연결 성공\n")
-    except Exception as e:
-        print(f"❌ Error: Ollama에 연결할 수 없습니다: {e}")
-        print("Ollama가 실행 중인지 확인하세요: ollama serve")
-        return
+    # try:
+    #     models = ollama.list()
+    #     model_names = [m['name'] for m in models.get('models', [])]
+    #     if OLLAMA_MODEL not in model_names:
+    #         print(f"❌ Error: 모델 '{OLLAMA_MODEL}'를 찾을 수 없습니다.")
+    #         print(f"사용 가능한 모델: {', '.join(model_names)}")
+    #         return
+    #     print(f"✅ Ollama 연결 성공\n")
+    # except Exception as e:
+    #     print(f"❌ Error: Ollama에 연결할 수 없습니다: {e}")
+    #     print("Ollama가 실행 중인지 확인하세요: ollama serve")
+    #     return
 
     with app.app_context():
         # 처리할 이미지 가져오기
