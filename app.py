@@ -12,6 +12,7 @@ app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gallery.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['READY_FOLDER'] = r'E:\1_WORK\outputs\WebUI'  # Folder for auto-loading images
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -31,11 +32,63 @@ def get_session_id():
     return session['session_id']
 
 
+def scan_and_import_ready_images():
+    """Scan the ready folder and import new images into the database (no file copying)"""
+    ready_folder = app.config['READY_FOLDER']
+
+    # Create folder if it doesn't exist
+    os.makedirs(ready_folder, exist_ok=True)
+
+    # Get all existing filenames from database (avoid query in loop)
+    existing_filenames = {img.filename for img in Image.query.with_entities(Image.filename).all()}
+
+    # Collect new images to import
+    new_images = []
+    for filename in os.listdir(ready_folder):
+        if not allowed_file(filename):
+            continue
+
+        # Check if already imported
+        if filename in existing_filenames:
+            continue
+
+        # Extract title from filename (without extension)
+        title = os.path.splitext(filename)[0]
+
+        # Create database entry (no file copying, use original filename)
+        image = Image(
+            filename=filename,
+            original_filename=filename,
+            title=title,
+            description=''
+        )
+        new_images.append(image)
+
+    # Add all new images at once
+    if new_images:
+        try:
+            db.session.add_all(new_images)
+            db.session.commit()
+            print(f"Imported {len(new_images)} new images from ready folder")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error importing images: {e}")
+            return 0
+
+    return len(new_images)
+
+
+@app.route('/ready/<path:filename>')
+def serve_ready_image(filename):
+    """Serve images from ready folder"""
+    return send_from_directory(app.config['READY_FOLDER'], filename)
+
+
 @app.route('/')
 def index():
     """Main gallery page"""
     page = request.args.get('page', 1, type=int)
-    per_page = 12
+    per_page = 24
     sort_by = request.args.get('sort', 'recent')  # recent, popular, most_liked
     tag_filter = request.args.get('tag', None)
 
@@ -65,64 +118,6 @@ def index():
                          all_tags=all_tags,
                          current_tag=tag_filter,
                          sort_by=sort_by)
-
-
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
-    """Image upload page and handler"""
-    if request.method == 'POST':
-        # Check if file is present
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
-
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-
-        if file and allowed_file(file.filename):
-            # Generate unique filename
-            original_filename = secure_filename(file.filename)
-            ext = original_filename.rsplit('.', 1)[1].lower()
-            filename = f"{uuid.uuid4()}.{ext}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-            # Save file
-            file.save(filepath)
-
-            # Create database entry
-            title = request.form.get('title', '')
-            description = request.form.get('description', '')
-            tags_str = request.form.get('tags', '')
-
-            image = Image(
-                filename=filename,
-                original_filename=original_filename,
-                title=title,
-                description=description
-            )
-
-            # Process tags
-            if tags_str:
-                tag_names = [tag.strip() for tag in tags_str.split(',') if tag.strip()]
-                for tag_name in tag_names:
-                    tag = Tag.query.filter_by(name=tag_name).first()
-                    if not tag:
-                        tag = Tag(name=tag_name)
-                        db.session.add(tag)
-                    image.tags.append(tag)
-
-            db.session.add(image)
-            db.session.commit()
-
-            return jsonify({
-                'success': True,
-                'message': 'Image uploaded successfully',
-                'image_id': image.id
-            })
-
-        return jsonify({'error': 'Invalid file type'}), 400
-
-    return render_template('upload.html')
 
 
 @app.route('/image/<int:image_id>')
@@ -181,7 +176,7 @@ def like_image(image_id):
 def api_images():
     """API endpoint for getting images with filters"""
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 12, type=int)
+    per_page = request.args.get('per_page', 21, type=int)
     tag = request.args.get('tag', None)
     search = request.args.get('search', None)
     sort_by = request.args.get('sort', 'recent')
@@ -229,25 +224,38 @@ def api_tags():
 
 @app.route('/api/image/<int:image_id>/delete', methods=['DELETE'])
 def delete_image(image_id):
-    """Delete an image"""
+    """Delete an image from gallery (removes from DB only, keeps original file)"""
     image = Image.query.get_or_404(image_id)
 
-    # Delete file
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], image.filename)
-    if os.path.exists(filepath):
-        os.remove(filepath)
-
-    # Delete from database
+    # Delete from database only (keep original file in ready folder)
     db.session.delete(image)
     db.session.commit()
 
-    return jsonify({'success': True, 'message': 'Image deleted successfully'})
+    return jsonify({'success': True, 'message': 'Image removed from gallery'})
 
 
-# Create database tables
+@app.route('/api/scan', methods=['POST'])
+def scan_images():
+    """Manually trigger image scan from ready folder"""
+    imported = scan_and_import_ready_images()
+    return jsonify({
+        'success': True,
+        'imported': imported,
+        'message': f'Imported {imported} new images'
+    })
+
+
+# Create database tables and import initial images
 with app.app_context():
     db.create_all()
+    # Scan and import images on startup
+    print("Scanning for new images...")
+    imported = scan_and_import_ready_images()
+    if imported > 0:
+        print(f"Imported {imported} images on startup")
+    else:
+        print("No new images to import")
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5003)

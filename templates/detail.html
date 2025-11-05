@@ -13,7 +13,6 @@
                 <h1 class="logo">Image Gallery</h1>
                 <div class="nav-links">
                     <a href="{{ url_for('index') }}" class="nav-link">Gallery</a>
-                    <a href="{{ url_for('upload') }}" class="nav-link">Upload</a>
                 </div>
             </div>
         </div>
@@ -22,7 +21,7 @@
     <div class="container main-content">
         <div class="detail-container">
             <div class="detail-image-section">
-                <img src="{{ url_for('static', filename='uploads/' + image.filename) }}"
+                <img src="{{ url_for('serve_ready_image', filename=image.filename) }}"
                      alt="{{ image.title or image.original_filename }}"
                      class="detail-image">
             </div>
@@ -76,10 +75,10 @@
                 </div>
 
                 <div class="detail-actions">
-                    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Gallery</a>
-                    <button id="deleteBtn" class="btn btn-danger" data-image-id="{{ image.id }}">
+                    <button onclick="history.back()" class="btn btn-secondary">Back to Gallery</button>
+                    <!-- <button id="deleteBtn" class="btn btn-danger" data-image-id="{{ image.id }}">
                         Delete Image
-                    </button>
+                    </button> -->
                 </div>
             </div>
         </div>
